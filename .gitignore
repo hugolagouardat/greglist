@@ -144,4 +144,4 @@ prompt.md
 *.suo
 *.ntvs*
 *.njsproj
-
+.github/agents/greglist-builder.agent.md
