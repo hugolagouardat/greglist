@@ -195,6 +195,10 @@ h2 {
   margin: 0;
 }
 
+.thread-bubble small {
+  color: var(--muted);
+}
+
 .pill {
   width: fit-content;
   margin: 0;
@@ -237,6 +241,36 @@ h2 {
   display: grid;
   gap: 0.45rem;
   color: var(--muted);
+}
+
+.checkbox-group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.checkbox-group legend {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.checkbox-label input {
+  width: auto;
 }
 
 .form-grid span {
@@ -293,6 +327,17 @@ h2 {
 
 .inline-button {
   width: fit-content;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.danger-button {
+  border-color: rgba(165, 51, 33, 0.35);
+  color: #a53321;
 }
 
 .status-text {

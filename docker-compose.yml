@@ -17,5 +17,58 @@ services:
       timeout: 5s
       retries: 5
 
+  back:
+    image: node:22-bookworm
+    container_name: greglist-back
+    restart: unless-stopped
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+      - API/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./API:/workspace
+      - back_node_modules:/workspace/node_modules
+    command: >-
+      sh -lc "npm install &&
+      npx prisma migrate deploy &&
+      npm run db:seed &&
+      node --watch src/app.js"
+
+  front:
+    image: node:22-bookworm
+    container_name: greglist-front
+    restart: unless-stopped
+    working_dir: /workspace
+    depends_on:
+      back:
+        condition: service_healthy
+    ports:
+      - "4173:4173"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4173').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./Front:/workspace
+      - front_node_modules:/workspace/node_modules
+    command: >-
+      sh -lc "npm install &&
+      npm run dev -- --host 0.0.0.0 --port 4173"
+
 volumes:
   postgres_data:
+  back_node_modules:
+  front_node_modules:

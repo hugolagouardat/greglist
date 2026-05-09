@@ -22,11 +22,12 @@
     try {
       const payload = {
         ...event.detail,
-        price: event.detail.price ? Number.parseFloat(event.detail.price) : null,
+        priceValue: event.detail.priceMode === 'FREE' ? null : Number.parseFloat(event.detail.priceValue),
+        status: 'DRAFT',
       }
       const ad = await createAd(payload, $auth.token)
-      draftMessage = `Annonce publiée: ${ad.title}.`
-      navigate(`/ads/${ad.id}`)
+      draftMessage = `Annonce en brouillon: ${ad.title}.`
+      navigate('/profile')
     } catch (error) {
       errorMessage = error.message
     } finally {
@@ -35,11 +36,11 @@
   }
 </script>
 
-<p class="summary">Prépare une offre ou une demande avec sa catégorie, sa ville, sa disponibilité et son tarif éventuel.</p>
+<p class="summary">Crée une annonce conforme avec catégorie fixe, tarif explicite et modalités de service. Elle sera enregistrée en brouillon puis publiable depuis ton profil.</p>
 
 <div class="placeholder-card stack-gap">
   {#if $isAuthenticated}
-    <AdForm on:submit={handleSubmit} />
+    <AdForm submitLabel="Enregistrer en brouillon" on:submit={handleSubmit} />
   {:else}
     <p>Connecte-toi pour publier une annonce.</p>
   {/if}

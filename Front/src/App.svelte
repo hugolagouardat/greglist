@@ -5,6 +5,7 @@
   import AdsPage from './pages/AdsPage.svelte'
   import AdDetailPage from './pages/AdDetailPage.svelte'
   import ConversationPage from './pages/ConversationPage.svelte'
+  import EditAdPage from './pages/EditAdPage.svelte'
   import HomePage from './pages/HomePage.svelte'
   import InboxPage from './pages/InboxPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
@@ -12,14 +13,19 @@
   import ProfilePage from './pages/ProfilePage.svelte'
   import RegisterPage from './pages/RegisterPage.svelte'
 
-  const links = [
+  const guestLinks = [
     { href: '/', label: 'Accueil' },
     { href: '/ads', label: 'Annonces' },
-    { href: '/ads/new', label: 'Publier' },
-    { href: '/profile', label: 'Profil' },
-    { href: '/inbox', label: 'Inbox' },
     { href: '/login', label: 'Connexion' },
     { href: '/register', label: 'Inscription' },
+  ]
+
+  const authenticatedLinks = [
+    { href: '/', label: 'Accueil' },
+    { href: '/ads', label: 'Annonces' },
+    { href: '/ads/new', label: 'Nouvelle annonce' },
+    { href: '/profile', label: 'Profil' },
+    { href: '/inbox', label: 'Inbox' },
   ]
 
   function onNavigate(event, href) {
@@ -40,6 +46,16 @@
     navigate('/')
   }
 
+  function isPrivatePath(path) {
+    return (
+      path === '/ads/new' ||
+      path === '/profile' ||
+      path === '/inbox' ||
+      /^\/conversations\/\d+$/.test(path) ||
+      /^\/ads\/\d+\/edit$/.test(path)
+    )
+  }
+
   function resolveView(currentRoute) {
     if (currentRoute.path === '/') {
       return { page: 'home', title: 'Accueil' }
@@ -57,6 +73,14 @@
       return {
         page: 'ad-detail',
         title: 'Détail d’annonce',
+        adId: Number.parseInt(currentRoute.path.split('/')[2], 10),
+      }
+    }
+
+    if (/^\/ads\/\d+\/edit$/.test(currentRoute.path)) {
+      return {
+        page: 'edit-ad',
+        title: 'Modifier une annonce',
         adId: Number.parseInt(currentRoute.path.split('/')[2], 10),
       }
     }
@@ -89,6 +113,10 @@
   }
 
   $: view = resolveView($route)
+  $: links = $isAuthenticated ? authenticatedLinks : guestLinks
+  $: if ($auth.ready && !$isAuthenticated && isPrivatePath($route.path) && $route.path !== '/login') {
+    navigate('/login')
+  }
 </script>
 
 <div class="shell">
@@ -119,7 +147,11 @@
       <p class="eyebrow">Greglist</p>
       <h1>{view.title}</h1>
 
-      {#if view.page === 'home'}
+      {#if !$auth.ready}
+        <div class="placeholder-card">
+          <p>Chargement de la session...</p>
+        </div>
+      {:else if view.page === 'home'}
         <HomePage />
       {:else if view.page === 'ads'}
         <AdsPage />
@@ -127,6 +159,8 @@
         <NewAdPage />
       {:else if view.page === 'ad-detail'}
         <AdDetailPage adId={view.adId} />
+      {:else if view.page === 'edit-ad'}
+        <EditAdPage adId={view.adId} />
       {:else if view.page === 'profile'}
         <ProfilePage />
       {:else if view.page === 'inbox'}

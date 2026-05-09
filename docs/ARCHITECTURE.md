@@ -1109,14 +1109,13 @@ Pourquoi ce niveau de détail est pertinent:
 
 La page conversation charge l'historique complet des messages.
 
-Un choix important est explicitement assumé dans l'interface:
+Le back gère désormais:
 
-- le back actuel gère la création du premier message,
-- mais pas encore la réponse dans une conversation existante.
+- la création du premier message depuis une annonce,
+- la lecture chronologique d'une conversation,
+- l'envoi d'une réponse dans une conversation existante via `POST /conversations/:id/messages`.
 
-La page l'indique clairement pour ne pas masquer une limite fonctionnelle réelle.
-
-Ce choix est plus honnête qu'un faux champ de réponse non branché.
+L'interface permet donc aux deux participants de poursuivre l'échange dans le même fil privé.
 
 ### 7.7.8 Ce que voit l'utilisateur selon son état
 
@@ -1305,30 +1304,19 @@ Ce n'est pas une règle générale universelle. C'est une décision adaptée à 
 
 Voici les limites fonctionnelles importantes à connaître.
 
-### 11.1 Pas de réponse à une conversation existante
-
-Le système gère:
-
-- la création du premier message,
-- la lecture des conversations.
-
-Il ne gère pas encore:
-
-- `POST /conversations/:id/messages` pour répondre ensuite.
-
-### 11.2 Pas d'édition de profil utilisateur
+### 11.1 Pas d'édition de profil utilisateur
 
 Le profil est affiché mais pas modifiable.
 
-### 11.3 Pas de pagination sur la liste des annonces
+### 11.2 Pas de pagination sur la liste des annonces
 
 Aujourd'hui, la liste récupère tout le jeu de résultats correspondant aux filtres.
 
-### 11.4 Pas de rafraîchissement temps réel
+### 11.3 Pas de rafraîchissement temps réel
 
 La messagerie est en lecture simple sans WebSocket ni polling automatique.
 
-### 11.5 Stockage du JWT en localStorage
+### 11.4 Stockage du JWT en localStorage
 
 Acceptable dans ce contexte, mais améliorable pour un vrai déploiement public.
 
@@ -1340,7 +1328,6 @@ Voici les extensions les plus naturelles.
 
 ### Côté back
 
-- ajouter la réponse dans une conversation existante,
 - ajouter l'archivage d'annonce côté UI,
 - ajouter la pagination sur `GET /ads`,
 - découper `app.js` en modules métier si le périmètre grandit,

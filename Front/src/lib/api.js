@@ -62,10 +62,47 @@ export function getAd(adId) {
   return request(`/ads/${adId}`)
 }
 
+export function getProtectedAd(adId, token) {
+  return request(`/ads/${adId}`, { token })
+}
+
 export function createAd(payload, token) {
   return request('/ads', {
     method: 'POST',
     body: payload,
+    token,
+  })
+}
+
+export function updateAd(adId, payload, token) {
+  return request(`/ads/${adId}`, {
+    method: 'PUT',
+    body: payload,
+    token,
+  })
+}
+
+export function deleteAd(adId, token) {
+  return request(`/ads/${adId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function getMyAds(token) {
+  return request('/me/ads', { token })
+}
+
+export function publishAd(adId, token) {
+  return request(`/ads/${adId}/publish`, {
+    method: 'POST',
+    token,
+  })
+}
+
+export function unpublishAd(adId, token) {
+  return request(`/ads/${adId}/unpublish`, {
+    method: 'POST',
     token,
   })
 }
@@ -84,4 +121,12 @@ export function getConversations(token) {
 
 export function getConversationMessages(conversationId, token) {
   return request(`/conversations/${conversationId}/messages`, { token })
+}
+
+export function sendConversationMessage(conversationId, content, token) {
+  return request(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: { content },
+    token,
+  })
 }

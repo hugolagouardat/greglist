@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { getAds } from '../lib/api.js'
+  import { adCategories, formatCategory, formatPrice, formatServiceTerms } from '../lib/adOptions.js'
   import { navigate } from '../lib/router.js'
 
   export const title = 'Annonces'
@@ -42,7 +43,7 @@
   $: void search, void type, void category, void city, void sort, loadAds()
 </script>
 
-<p class="summary">Recherche, filtre et trie les annonces avant le branchement direct au back-end.</p>
+<p class="summary">Parcours les annonces publiees, recherche par mots-cles, filtre par type ou categorie, et trie les resultats par date ou tarif.</p>
 
 <section class="stack-gap">
   <div class="placeholder-card">
@@ -61,7 +62,12 @@
       </label>
       <label>
         <span>Catégorie</span>
-        <input bind:value={category} placeholder="Bricolage" />
+        <select bind:value={category}>
+          <option value="">Toutes</option>
+          {#each adCategories as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
       </label>
       <label>
         <span>Ville</span>
@@ -94,9 +100,10 @@
         <h2>{ad.title}</h2>
         <p>{ad.description}</p>
         <div class="card-meta">
-          <span>{ad.category}</span>
+          <span>{formatCategory(ad.category)}</span>
           <span>{ad.city}</span>
-          <span>{ad.price ? `${ad.price} €` : 'Prix à définir'}</span>
+          <span>{formatPrice(ad)}</span>
+          <span>{formatServiceTerms(ad.serviceTerms)}</span>
         </div>
         <button class="primary-button" type="button" on:click={() => navigate(`/ads/${ad.id}`)}>
           Voir l’annonce

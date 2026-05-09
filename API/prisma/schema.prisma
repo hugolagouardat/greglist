@@ -11,9 +11,32 @@ enum AdType {
   REQUEST
 }
 
+enum AdCategory {
+  HOME_HELP
+  GARDENING
+  TUTORING
+  IT_SUPPORT
+  BEAUTY_WELLNESS
+  EVENTS
+  MOVING_DELIVERY
+  OTHER
+}
+
+enum PriceMode {
+  FREE
+  HOURLY
+  FIXED
+}
+
+enum ServiceTerm {
+  REMOTE
+  AT_PROVIDER
+  AT_CUSTOMER
+}
+
 enum AdStatus {
+  DRAFT
   PUBLISHED
-  ARCHIVED
 }
 
 model User {
@@ -31,21 +54,22 @@ model User {
 }
 
 model Ad {
-  id           Int       @id @default(autoincrement())
-  type         AdType
-  title        String
-  description  String
-  category     String
-  city         String
-  availability String?
-  price        Decimal?  @db.Decimal(10, 2)
-  terms        String?
-  status       AdStatus  @default(PUBLISHED)
-  ownerId      Int
+  id            Int           @id @default(autoincrement())
+  type          AdType
+  title         String
+  description   String
+  category      AdCategory
+  city          String
+  availability  String?
+  priceMode     PriceMode
+  priceValue    Decimal?      @db.Decimal(10, 2)
+  serviceTerms  ServiceTerm[]
+  status        AdStatus      @default(DRAFT)
+  ownerId       Int
   owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   conversations Conversation[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Conversation {

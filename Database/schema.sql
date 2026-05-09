@@ -1,10 +1,28 @@
--- Export du schéma initial Greglist
+-- Greglist database schema export
 
 -- CreateEnum
 CREATE TYPE "AdType" AS ENUM ('OFFER', 'REQUEST');
 
 -- CreateEnum
-CREATE TYPE "AdStatus" AS ENUM ('PUBLISHED', 'ARCHIVED');
+CREATE TYPE "AdCategory" AS ENUM (
+    'HOME_HELP',
+    'GARDENING',
+    'TUTORING',
+    'IT_SUPPORT',
+    'BEAUTY_WELLNESS',
+    'EVENTS',
+    'MOVING_DELIVERY',
+    'OTHER'
+);
+
+-- CreateEnum
+CREATE TYPE "PriceMode" AS ENUM ('FREE', 'HOURLY', 'FIXED');
+
+-- CreateEnum
+CREATE TYPE "ServiceTerm" AS ENUM ('REMOTE', 'AT_PROVIDER', 'AT_CUSTOMER');
+
+-- CreateEnum
+CREATE TYPE "AdStatus" AS ENUM ('DRAFT', 'PUBLISHED');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -25,12 +43,13 @@ CREATE TABLE "Ad" (
     "type" "AdType" NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "category" TEXT NOT NULL,
+    "category" "AdCategory" NOT NULL,
     "city" TEXT NOT NULL,
     "availability" TEXT,
-    "price" DECIMAL(10,2),
-    "terms" TEXT,
-    "status" "AdStatus" NOT NULL DEFAULT 'PUBLISHED',
+    "priceMode" "PriceMode" NOT NULL,
+    "priceValue" DECIMAL(10,2),
+    "serviceTerms" "ServiceTerm"[] NOT NULL,
+    "status" "AdStatus" NOT NULL DEFAULT 'DRAFT',
     "ownerId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

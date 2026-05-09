@@ -1,5 +1,6 @@
 <script>
-  import { getAd, startConversation } from '../lib/api.js'
+  import { deleteAd, getAd, getProtectedAd, publishAd, startConversation, unpublishAd } from '../lib/api.js'
+  import { formatCategory, formatPrice, formatServiceTerms } from '../lib/adOptions.js'
   import { navigate } from '../lib/router.js'
   import { auth, isAuthenticated } from '../lib/stores/auth.js'
   import { onMount } from 'svelte'
@@ -11,13 +12,16 @@
   let isLoading = true
   let isSubmitting = false
   let errorMessage = ''
+  let loadKey = ''
+
+  $: isOwner = Boolean(ad && $auth.user?.id === ad.ownerId)
 
   async function loadAd() {
     isLoading = true
     errorMessage = ''
 
     try {
-      ad = await getAd(adId)
+      ad = $isAuthenticated ? await getProtectedAd(adId, $auth.token) : await getAd(adId)
     } catch (error) {
       errorMessage = error.message
     } finally {
@@ -25,9 +29,48 @@
     }
   }
 
+      $: {
+        const nextLoadKey = `${adId}:${$auth.ready ? $auth.token : 'pending'}`
+
+        if ($auth.ready && nextLoadKey !== loadKey) {
+          loadKey = nextLoadKey
+          loadAd()
+        }
+      }
+
+  async function handlePublish() {
+    try {
+      ad = await publishAd(ad.id, $auth.token)
+    } catch (error) {
+      errorMessage = error.message
+    }
+  }
+
+  async function handleUnpublish() {
+    try {
+      ad = await unpublishAd(ad.id, $auth.token)
+    } catch (error) {
+      errorMessage = error.message
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteAd(ad.id, $auth.token)
+      navigate('/profile')
+    } catch (error) {
+      errorMessage = error.message
+    }
+  }
+
   async function handleFirstMessage() {
     if (!$isAuthenticated) {
-      errorMessage = 'Connecte-toi pour envoyer un message.'
+      navigate('/login')
+      return
+    }
+
+    if (isOwner) {
+      errorMessage = 'Tu ne peux pas contacter ta propre annonce.'
       return
     }
 
@@ -56,7 +99,7 @@
   }
 </script>
 
-<p class="summary">Le détail de l’annonce présente les informations clés avant l’ouverture d’une conversation.</p>
+<p class="summary">Consulte le detail d’une annonce publiee, puis ouvre un premier contact prive avec l’auteur. Le proprietaire peut aussi gerer la publication depuis cet ecran.</p>
 
 <section class="detail-layout">
   {#if isLoading}
@@ -72,20 +115,42 @@
     <h2>{ad.title}</h2>
     <p>{ad.description}</p>
     <div class="card-meta">
-      <span>{ad.category}</span>
+      <span>{formatCategory(ad.category)}</span>
       <span>{ad.city}</span>
-      <span>{ad.price ? `${ad.price} €` : 'Prix à définir'}</span>
+      <span>{formatPrice(ad)}</span>
       <span>{ad.availability || 'Disponibilité à préciser'}</span>
+      <span>{formatServiceTerms(ad.serviceTerms)}</span>
+      <span>{ad.status === 'PUBLISHED' ? 'Publiee' : 'Brouillon'}</span>
     </div>
+    <p>Annonce de {ad.owner?.pseudo || 'Utilisateur inconnu'}.</p>
+
+    {#if isOwner}
+      <div class="action-row">
+        <button class="ghost-button" type="button" on:click={() => navigate(`/ads/${ad.id}/edit`)}>
+          Modifier
+        </button>
+        {#if ad.status === 'PUBLISHED'}
+          <button class="ghost-button" type="button" on:click={handleUnpublish}>Depublier</button>
+        {:else}
+          <button class="primary-button" type="button" on:click={handlePublish}>Publier</button>
+        {/if}
+        <button class="ghost-button danger-button" type="button" on:click={handleDelete}>Supprimer</button>
+      </div>
+    {/if}
   </article>
 
   <aside class="placeholder-card stack-gap">
-    <h2>Contact</h2>
-    <p>{ad.terms || 'Modalités à préciser avec le propriétaire.'}</p>
-    <textarea bind:value={firstMessage} rows="5" placeholder="Votre premier message"></textarea>
-    <button class="primary-button" type="button" on:click={handleFirstMessage} disabled={isSubmitting}>
-      {isSubmitting ? 'Envoi...' : 'Envoyer un message'}
-    </button>
+    {#if isOwner}
+      <h2>Gestion</h2>
+      <p>Cette annonce t’appartient. Utilise les actions ci-contre pour la modifier, la publier, la depublier ou la supprimer.</p>
+    {:else}
+      <h2>Contact</h2>
+      <p>{formatServiceTerms(ad.serviceTerms)}</p>
+      <textarea bind:value={firstMessage} rows="5" placeholder="Votre premier message"></textarea>
+      <button class="primary-button" type="button" on:click={handleFirstMessage} disabled={isSubmitting}>
+        {isSubmitting ? 'Envoi...' : 'Envoyer un message'}
+      </button>
+    {/if}
     {#if errorMessage}
       <p class="error-text">{errorMessage}</p>
     {/if}

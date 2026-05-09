@@ -7,153 +7,265 @@ const morgan = require("morgan");
 const prisma = require("./lib/prisma");
 const { requireAuth } = require("./middleware/auth");
 const { hashPassword, verifyPassword } = require("./utils/hash");
-const { signAuthToken } = require("./utils/token");
+const { signAuthToken, verifyAuthToken } = require("./utils/token");
 
 const app = express();
 const port = process.env.PORT || 3000;
+
 const adTypes = new Set(["OFFER", "REQUEST"]);
-const adStatuses = new Set(["PUBLISHED", "ARCHIVED"]);
+const adCategories = new Set([
+  "HOME_HELP",
+  "GARDENING",
+  "TUTORING",
+  "IT_SUPPORT",
+  "BEAUTY_WELLNESS",
+  "EVENTS",
+  "MOVING_DELIVERY",
+  "OTHER",
+]);
+const priceModes = new Set(["FREE", "HOURLY", "FIXED"]);
+const serviceTerms = new Set(["REMOTE", "AT_PROVIDER", "AT_CUSTOMER"]);
+const adStatuses = new Set(["DRAFT", "PUBLISHED"]);
 
-function buildAdCreateInput(payload) {
-  const { type, title, description, category, city, availability, price, terms, status } = payload;
+function createHttpError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
-  if (
-    !adTypes.has(type) ||
-    typeof title !== "string" ||
-    title.trim().length < 3 ||
-    typeof description !== "string" ||
-    description.trim().length < 10 ||
-    typeof category !== "string" ||
-    category.trim().length < 2 ||
-    typeof city !== "string" ||
-    city.trim().length < 2 ||
-    (availability !== undefined && availability !== null && typeof availability !== "string") ||
-    (price !== undefined && price !== null && (typeof price !== "number" || Number.isNaN(price) || price < 0)) ||
-    (terms !== undefined && terms !== null && typeof terms !== "string") ||
-    (status !== undefined && !adStatuses.has(status))
-  ) {
-    const error = new Error("Invalid ad payload");
-    error.statusCode = 400;
-    throw error;
+function getOptionalAuth(request) {
+  const authorization = request.headers.authorization;
+
+  if (!authorization || !authorization.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authorization.slice(7).trim();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return verifyAuthToken(token);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRequiredString(value, fieldName, minLength) {
+  if (typeof value !== "string" || value.trim().length < minLength) {
+    throw createHttpError(`Invalid ${fieldName}`, 400);
+  }
+
+  return value.trim();
+}
+
+function normalizeOptionalString(value, fieldName) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw createHttpError(`Invalid ${fieldName}`, 400);
+  }
+
+  return value.trim() ? value.trim() : null;
+}
+
+function normalizePriceValue(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
+    throw createHttpError("Invalid priceValue", 400);
+  }
+
+  return value;
+}
+
+function normalizeServiceTerms(value) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw createHttpError("At least one service term is required", 400);
+  }
+
+  const normalized = [...new Set(value.map((term) => {
+    if (typeof term !== "string" || !serviceTerms.has(term)) {
+      throw createHttpError("Invalid serviceTerms", 400);
+    }
+
+    return term;
+  }))];
+
+  if (normalized.length === 0) {
+    throw createHttpError("At least one service term is required", 400);
+  }
+
+  return normalized;
+}
+
+function normalizeAdInput(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw createHttpError("Invalid ad payload", 400);
+  }
+
+  if (!adTypes.has(payload.type)) {
+    throw createHttpError("Invalid type", 400);
+  }
+
+  if (!adCategories.has(payload.category)) {
+    throw createHttpError("Invalid category", 400);
+  }
+
+  if (!priceModes.has(payload.priceMode)) {
+    throw createHttpError("Invalid priceMode", 400);
+  }
+
+  if (payload.status !== undefined && !adStatuses.has(payload.status)) {
+    throw createHttpError("Invalid status", 400);
+  }
+
+  const priceValue = normalizePriceValue(payload.priceValue);
+
+  if (payload.priceMode === "FREE" && priceValue !== null) {
+    throw createHttpError("priceValue must be null when priceMode is FREE", 400);
+  }
+
+  if ((payload.priceMode === "HOURLY" || payload.priceMode === "FIXED") && priceValue === null) {
+    throw createHttpError("priceValue is required when priceMode is HOURLY or FIXED", 400);
   }
 
   return {
-    type,
-    title: title.trim(),
-    description: description.trim(),
-    category: category.trim(),
-    city: city.trim(),
-    availability: typeof availability === "string" && availability.trim() ? availability.trim() : null,
-    price: typeof price === "number" ? price : null,
-    terms: typeof terms === "string" && terms.trim() ? terms.trim() : null,
-    status: status || "PUBLISHED",
+    type: payload.type,
+    title: normalizeRequiredString(payload.title, "title", 3),
+    description: normalizeRequiredString(payload.description, "description", 10),
+    category: payload.category,
+    city: normalizeRequiredString(payload.city, "city", 2),
+    availability: normalizeOptionalString(payload.availability, "availability"),
+    priceMode: payload.priceMode,
+    priceValue,
+    serviceTerms: normalizeServiceTerms(payload.serviceTerms),
+    status: payload.status || "DRAFT",
   };
 }
 
-function buildAdUpdateInput(payload) {
-  const update = {};
-
-  if (payload.type !== undefined) {
-    if (!adTypes.has(payload.type)) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.type = payload.type;
+function buildAdUpdateData(existingAd, payload) {
+  if (!payload || typeof payload !== "object") {
+    throw createHttpError("Invalid ad payload", 400);
   }
 
-  if (payload.title !== undefined) {
-    if (typeof payload.title !== "string" || payload.title.trim().length < 3) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
+  const allowedFields = [
+    "type",
+    "title",
+    "description",
+    "category",
+    "city",
+    "availability",
+    "priceMode",
+    "priceValue",
+    "serviceTerms",
+    "status",
+  ];
+  const hasAllowedField = allowedFields.some((field) => Object.hasOwn(payload, field));
 
-    update.title = payload.title.trim();
+  if (!hasAllowedField) {
+    throw createHttpError("At least one field is required", 400);
   }
 
-  if (payload.description !== undefined) {
-    if (typeof payload.description !== "string" || payload.description.trim().length < 10) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
+  const mergedPayload = {
+    type: Object.hasOwn(payload, "type") ? payload.type : existingAd.type,
+    title: Object.hasOwn(payload, "title") ? payload.title : existingAd.title,
+    description: Object.hasOwn(payload, "description") ? payload.description : existingAd.description,
+    category: Object.hasOwn(payload, "category") ? payload.category : existingAd.category,
+    city: Object.hasOwn(payload, "city") ? payload.city : existingAd.city,
+    availability: Object.hasOwn(payload, "availability") ? payload.availability : existingAd.availability,
+    priceMode: Object.hasOwn(payload, "priceMode") ? payload.priceMode : existingAd.priceMode,
+    priceValue: Object.hasOwn(payload, "priceValue")
+      ? payload.priceValue
+      : (existingAd.priceValue === null ? null : Number(existingAd.priceValue)),
+    serviceTerms: Object.hasOwn(payload, "serviceTerms") ? payload.serviceTerms : existingAd.serviceTerms,
+    status: Object.hasOwn(payload, "status") ? payload.status : existingAd.status,
+  };
 
-    update.description = payload.description.trim();
+  return normalizeAdInput(mergedPayload);
+}
+
+async function createConversationMessage(conversationId, senderId, content) {
+  return prisma.$transaction(async (transaction) => {
+    const message = await transaction.message.create({
+      data: {
+        content: content.trim(),
+        conversationId,
+        senderId,
+      },
+    });
+
+    await transaction.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    return message;
+  });
+}
+
+async function getOwnedAdOrThrow(adId, userId) {
+  const ad = await prisma.ad.findUnique({
+    where: { id: adId },
+  });
+
+  if (!ad) {
+    throw createHttpError("Ad not found", 404);
   }
 
-  if (payload.category !== undefined) {
-    if (typeof payload.category !== "string" || payload.category.trim().length < 2) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.category = payload.category.trim();
+  if (ad.ownerId !== userId) {
+    throw createHttpError("You are not allowed to manage this ad", 403);
   }
 
-  if (payload.city !== undefined) {
-    if (typeof payload.city !== "string" || payload.city.trim().length < 2) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
+  return ad;
+}
 
-    update.city = payload.city.trim();
+async function getConversationForUserOrThrow(conversationId, userId) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      ad: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+        },
+      },
+      owner: {
+        select: {
+          id: true,
+          pseudo: true,
+          city: true,
+        },
+      },
+      participant: {
+        select: {
+          id: true,
+          pseudo: true,
+          city: true,
+        },
+      },
+      messages: {
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  if (!conversation) {
+    throw createHttpError("Conversation not found", 404);
   }
 
-  if (payload.availability !== undefined) {
-    if (payload.availability !== null && typeof payload.availability !== "string") {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.availability = typeof payload.availability === "string" && payload.availability.trim()
-      ? payload.availability.trim()
-      : null;
+  if (conversation.ownerId !== userId && conversation.participantId !== userId) {
+    throw createHttpError("You are not allowed to access this conversation", 403);
   }
 
-  if (payload.price !== undefined) {
-    if (payload.price !== null && (typeof payload.price !== "number" || Number.isNaN(payload.price) || payload.price < 0)) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.price = typeof payload.price === "number" ? payload.price : null;
-  }
-
-  if (payload.terms !== undefined) {
-    if (payload.terms !== null && typeof payload.terms !== "string") {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.terms = typeof payload.terms === "string" && payload.terms.trim()
-      ? payload.terms.trim()
-      : null;
-  }
-
-  if (payload.status !== undefined) {
-    if (!adStatuses.has(payload.status)) {
-      const error = new Error("Invalid ad payload");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    update.status = payload.status;
-  }
-
-  if (Object.keys(update).length === 0) {
-    const error = new Error("At least one field is required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  return update;
+  return conversation;
 }
 
 app.use(helmet());
@@ -178,9 +290,7 @@ app.post("/register", async (request, response, next) => {
       typeof password !== "string" ||
       password.length < 8
     ) {
-      const error = new Error("Invalid registration payload");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid registration payload", 400);
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -188,9 +298,7 @@ app.post("/register", async (request, response, next) => {
     });
 
     if (existingUser) {
-      const error = new Error("Pseudo already in use");
-      error.statusCode = 409;
-      throw error;
+      throw createHttpError("Pseudo already in use", 409);
     }
 
     const user = await prisma.user.create({
@@ -228,9 +336,7 @@ app.post("/login", async (request, response, next) => {
       typeof password !== "string" ||
       password.length < 8
     ) {
-      const error = new Error("Invalid login payload");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid login payload", 400);
     }
 
     const user = await prisma.user.findUnique({
@@ -238,9 +344,7 @@ app.post("/login", async (request, response, next) => {
     });
 
     if (!user || !(await verifyPassword(password, user.password))) {
-      const error = new Error("Invalid credentials");
-      error.statusCode = 401;
-      throw error;
+      throw createHttpError("Invalid credentials", 401);
     }
 
     const token = signAuthToken({ userId: user.id, pseudo: user.pseudo });
@@ -263,9 +367,22 @@ app.post("/logout", requireAuth, (_request, response) => {
   response.status(204).send();
 });
 
+app.get("/me/ads", requireAuth, async (request, response, next) => {
+  try {
+    const ads = await prisma.ad.findMany({
+      where: { ownerId: request.auth.userId },
+      orderBy: [{ updatedAt: "desc" }],
+    });
+
+    response.json(ads);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/ads", requireAuth, async (request, response, next) => {
   try {
-    const adInput = buildAdCreateInput(request.body);
+    const adInput = normalizeAdInput(request.body);
 
     const ad = await prisma.ad.create({
       data: {
@@ -285,41 +402,38 @@ app.get("/ads", async (request, response, next) => {
     const search = typeof request.query.search === "string" ? request.query.search.trim() : "";
     const type = typeof request.query.type === "string" ? request.query.type.trim() : "";
     const sort = typeof request.query.sort === "string" ? request.query.sort.trim() : "newest";
-    const where = {
-      status: "PUBLISHED",
-    };
+    const category = typeof request.query.category === "string" ? request.query.category.trim() : "";
+    const city = typeof request.query.city === "string" ? request.query.city.trim() : "";
+    const where = { status: "PUBLISHED" };
     let orderBy = [{ createdAt: "desc" }];
 
     if (sort === "price_asc") {
-      orderBy = [{ price: "asc" }, { createdAt: "desc" }];
+      orderBy = [{ priceValue: "asc" }, { createdAt: "desc" }];
     } else if (sort === "price_desc") {
-      orderBy = [{ price: "desc" }, { createdAt: "desc" }];
+      orderBy = [{ priceValue: "desc" }, { createdAt: "desc" }];
     } else if (sort !== "newest") {
-      const error = new Error("Invalid sort option");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid sort option", 400);
     }
 
     if (type) {
       if (!adTypes.has(type)) {
-        const error = new Error("Invalid ad type filter");
-        error.statusCode = 400;
-        throw error;
+        throw createHttpError("Invalid ad type filter", 400);
       }
 
       where.type = type;
     }
 
-    if (typeof request.query.category === "string" && request.query.category.trim()) {
-      where.category = {
-        equals: request.query.category.trim(),
-        mode: "insensitive",
-      };
+    if (category) {
+      if (!adCategories.has(category)) {
+        throw createHttpError("Invalid category filter", 400);
+      }
+
+      where.category = category;
     }
 
-    if (typeof request.query.city === "string" && request.query.city.trim()) {
+    if (city) {
       where.city = {
-        equals: request.query.city.trim(),
+        equals: city,
         mode: "insensitive",
       };
     }
@@ -344,6 +458,15 @@ app.get("/ads", async (request, response, next) => {
     const ads = await prisma.ad.findMany({
       where,
       orderBy,
+      include: {
+        owner: {
+          select: {
+            id: true,
+            pseudo: true,
+            city: true,
+          },
+        },
+      },
     });
 
     response.json(ads);
@@ -357,19 +480,32 @@ app.get("/ads/:id", async (request, response, next) => {
     const adId = Number.parseInt(request.params.id, 10);
 
     if (Number.isNaN(adId) || adId <= 0) {
-      const error = new Error("Invalid ad id");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid ad id", 400);
     }
 
     const ad = await prisma.ad.findUnique({
       where: { id: adId },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            pseudo: true,
+            city: true,
+            bio: true,
+          },
+        },
+      },
     });
 
     if (!ad) {
-      const error = new Error("Ad not found");
-      error.statusCode = 404;
-      throw error;
+      throw createHttpError("Ad not found", 404);
+    }
+
+    const auth = getOptionalAuth(request);
+    const isOwner = auth?.userId === ad.ownerId;
+
+    if (ad.status !== "PUBLISHED" && !isOwner) {
+      throw createHttpError("Ad not found", 404);
     }
 
     response.json(ad);
@@ -383,31 +519,53 @@ app.put("/ads/:id", requireAuth, async (request, response, next) => {
     const adId = Number.parseInt(request.params.id, 10);
 
     if (Number.isNaN(adId) || adId <= 0) {
-      const error = new Error("Invalid ad id");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid ad id", 400);
     }
 
-    const existingAd = await prisma.ad.findUnique({
-      where: { id: adId },
-      select: { ownerId: true },
-    });
-
-    if (!existingAd) {
-      const error = new Error("Ad not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (existingAd.ownerId !== request.auth.userId) {
-      const error = new Error("You are not allowed to modify this ad");
-      error.statusCode = 403;
-      throw error;
-    }
-
+    const existingAd = await getOwnedAdOrThrow(adId, request.auth.userId);
     const ad = await prisma.ad.update({
       where: { id: adId },
-      data: buildAdUpdateInput(request.body),
+      data: buildAdUpdateData(existingAd, request.body),
+    });
+
+    response.json(ad);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/ads/:id/publish", requireAuth, async (request, response, next) => {
+  try {
+    const adId = Number.parseInt(request.params.id, 10);
+
+    if (Number.isNaN(adId) || adId <= 0) {
+      throw createHttpError("Invalid ad id", 400);
+    }
+
+    const existingAd = await getOwnedAdOrThrow(adId, request.auth.userId);
+    const ad = await prisma.ad.update({
+      where: { id: existingAd.id },
+      data: { status: "PUBLISHED" },
+    });
+
+    response.json(ad);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/ads/:id/unpublish", requireAuth, async (request, response, next) => {
+  try {
+    const adId = Number.parseInt(request.params.id, 10);
+
+    if (Number.isNaN(adId) || adId <= 0) {
+      throw createHttpError("Invalid ad id", 400);
+    }
+
+    const existingAd = await getOwnedAdOrThrow(adId, request.auth.userId);
+    const ad = await prisma.ad.update({
+      where: { id: existingAd.id },
+      data: { status: "DRAFT" },
     });
 
     response.json(ad);
@@ -421,28 +579,10 @@ app.delete("/ads/:id", requireAuth, async (request, response, next) => {
     const adId = Number.parseInt(request.params.id, 10);
 
     if (Number.isNaN(adId) || adId <= 0) {
-      const error = new Error("Invalid ad id");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid ad id", 400);
     }
 
-    const existingAd = await prisma.ad.findUnique({
-      where: { id: adId },
-      select: { ownerId: true },
-    });
-
-    if (!existingAd) {
-      const error = new Error("Ad not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (existingAd.ownerId !== request.auth.userId) {
-      const error = new Error("You are not allowed to delete this ad");
-      error.statusCode = 403;
-      throw error;
-    }
-
+    await getOwnedAdOrThrow(adId, request.auth.userId);
     await prisma.ad.delete({
       where: { id: adId },
     });
@@ -456,35 +596,23 @@ app.delete("/ads/:id", requireAuth, async (request, response, next) => {
 app.post("/ads/:id/conversations", requireAuth, async (request, response, next) => {
   try {
     const adId = Number.parseInt(request.params.id, 10);
-    const { content } = request.body;
+    const content = normalizeRequiredString(request.body?.content, "message content", 1);
 
     if (Number.isNaN(adId) || adId <= 0) {
-      const error = new Error("Invalid ad id");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    if (typeof content !== "string" || content.trim().length < 1) {
-      const error = new Error("Message content is required");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid ad id", 400);
     }
 
     const ad = await prisma.ad.findUnique({
       where: { id: adId },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, status: true },
     });
 
-    if (!ad) {
-      const error = new Error("Ad not found");
-      error.statusCode = 404;
-      throw error;
+    if (!ad || ad.status !== "PUBLISHED") {
+      throw createHttpError("Ad not found", 404);
     }
 
     if (ad.ownerId === request.auth.userId) {
-      const error = new Error("You cannot message your own ad");
-      error.statusCode = 403;
-      throw error;
+      throw createHttpError("You cannot message your own ad", 403);
     }
 
     const conversation = await prisma.conversation.upsert({
@@ -503,13 +631,7 @@ app.post("/ads/:id/conversations", requireAuth, async (request, response, next) 
       },
     });
 
-    const message = await prisma.message.create({
-      data: {
-        content: content.trim(),
-        conversationId: conversation.id,
-        senderId: request.auth.userId,
-      },
-    });
+    const message = await createConversationMessage(conversation.id, request.auth.userId, content);
 
     response.status(201).json({ conversation, message });
   } catch (error) {
@@ -527,7 +649,25 @@ app.get("/conversations", requireAuth, async (request, response, next) => {
         ],
       },
       include: {
-        ad: true,
+        ad: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+        owner: {
+          select: {
+            id: true,
+            pseudo: true,
+          },
+        },
+        participant: {
+          select: {
+            id: true,
+            pseudo: true,
+          },
+        },
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -547,45 +687,36 @@ app.get("/conversations/:id/messages", requireAuth, async (request, response, ne
     const conversationId = Number.parseInt(request.params.id, 10);
 
     if (Number.isNaN(conversationId) || conversationId <= 0) {
-      const error = new Error("Invalid conversation id");
-      error.statusCode = 400;
-      throw error;
+      throw createHttpError("Invalid conversation id", 400);
     }
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: {
-        messages: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    if (!conversation) {
-      const error = new Error("Conversation not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (
-      conversation.ownerId !== request.auth.userId &&
-      conversation.participantId !== request.auth.userId
-    ) {
-      const error = new Error("You are not allowed to access this conversation");
-      error.statusCode = 403;
-      throw error;
-    }
-
+    const conversation = await getConversationForUserOrThrow(conversationId, request.auth.userId);
     response.json(conversation);
   } catch (error) {
     next(error);
   }
 });
 
+app.post("/conversations/:id/messages", requireAuth, async (request, response, next) => {
+  try {
+    const conversationId = Number.parseInt(request.params.id, 10);
+
+    if (Number.isNaN(conversationId) || conversationId <= 0) {
+      throw createHttpError("Invalid conversation id", 400);
+    }
+
+    await getConversationForUserOrThrow(conversationId, request.auth.userId);
+    const content = normalizeRequiredString(request.body?.content, "message content", 1);
+    const message = await createConversationMessage(conversationId, request.auth.userId, content);
+
+    response.status(201).json(message);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use((request, _response, next) => {
-  const error = new Error(`Route not found: ${request.method} ${request.originalUrl}`);
-  error.statusCode = 404;
-  next(error);
+  next(createHttpError(`Route not found: ${request.method} ${request.originalUrl}`, 404));
 });
 
 app.use((error, _request, response, _next) => {
@@ -596,6 +727,10 @@ app.use((error, _request, response, _next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`API listening on port ${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`API listening on port ${port}`);
+  });
+}
+
+module.exports = app;
