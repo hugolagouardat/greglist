@@ -45,12 +45,24 @@ model User {
   city      String
   bio       String?
   password  String
+  avatar    UserAvatar?
   ads       Ad[]
   ownedConversations       Conversation[] @relation("ConversationOwner")
   participatingConversations Conversation[] @relation("ConversationParticipant")
   messages  Message[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserAvatar {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Ad {
@@ -66,10 +78,26 @@ model Ad {
   serviceTerms  ServiceTerm[]
   status        AdStatus      @default(DRAFT)
   ownerId       Int
-  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  images        AdImage[]
   conversations Conversation[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model AdImage {
+  id           Int      @id @default(autoincrement())
+  adId         Int
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  position     Int
+  ad           Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([adId, position])
+  @@unique([adId, position])
 }
 
 model Conversation {

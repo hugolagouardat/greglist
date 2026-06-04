@@ -27,7 +27,7 @@
       }
       const ad = await createAd(payload, $auth.token)
       draftMessage = `Annonce en brouillon: ${ad.title}.`
-      navigate('/profile')
+      navigate(`/ads/${ad.id}`)
     } catch (error) {
       errorMessage = error.message
     } finally {
@@ -36,7 +36,7 @@
   }
 </script>
 
-<p class="summary">Crée une annonce conforme avec catégorie fixe, tarif explicite et modalités de service. Elle sera enregistrée en brouillon puis publiable depuis ton profil.</p>
+<p class="summary">Crée une annonce complète avec galerie d’images, puis enregistre-la en brouillon avant publication.</p>
 
 <div class="placeholder-card stack-gap">
   {#if $isAuthenticated}

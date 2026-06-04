@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte'
   import { createEventDispatcher } from 'svelte'
   import { adCategories, priceModes, serviceTerms } from '../adOptions.js'
 
@@ -15,6 +16,8 @@
   let priceMode = initialValue?.priceMode || 'FREE'
   let priceValue = initialValue?.priceValue ?? ''
   let selectedServiceTerms = initialValue?.serviceTerms?.length ? [...initialValue.serviceTerms] : ['REMOTE']
+  let galleryItems = []
+  let imageMessage = ''
   let syncedInitialValue = null
 
   $: if (initialValue && initialValue !== syncedInitialValue) {
@@ -27,12 +30,26 @@
     priceMode = initialValue.priceMode
     priceValue = initialValue.priceValue ?? ''
     selectedServiceTerms = initialValue.serviceTerms?.length ? [...initialValue.serviceTerms] : ['REMOTE']
+    galleryItems = (initialValue.images || []).map((image) => ({
+      kind: 'existing',
+      id: image.id,
+      label: image.originalName,
+      url: image.url,
+    }))
     syncedInitialValue = initialValue
   }
 
   $: if (priceMode === 'FREE') {
     priceValue = ''
   }
+
+  onDestroy(() => {
+    galleryItems.forEach((item) => {
+      if (item.kind === 'new') {
+        URL.revokeObjectURL(item.url)
+      }
+    })
+  })
 
   function toggleServiceTerm(term) {
     if (selectedServiceTerms.includes(term)) {
@@ -47,6 +64,63 @@
     selectedServiceTerms = [...selectedServiceTerms, term]
   }
 
+  function createClientId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+
+    return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  function handleImagesSelected(event) {
+    const nextFiles = Array.from(event.currentTarget.files || [])
+    const remainingSlots = Math.max(0, 10 - galleryItems.length)
+
+    if (!nextFiles.length) {
+      return
+    }
+
+    if (remainingSlots === 0) {
+      imageMessage = 'Maximum 10 images par annonce.'
+      event.currentTarget.value = ''
+      return
+    }
+
+    const acceptedFiles = nextFiles.slice(0, remainingSlots)
+    const nextItems = acceptedFiles.map((file) => ({
+      kind: 'new',
+      clientId: createClientId(),
+      file,
+      label: file.name,
+      url: URL.createObjectURL(file),
+    }))
+
+    imageMessage = nextFiles.length > acceptedFiles.length ? 'Certaines images ont été ignorées: limite de 10.' : ''
+    galleryItems = [...galleryItems, ...nextItems]
+    event.currentTarget.value = ''
+  }
+
+  function removeImage(item) {
+    if (item.kind === 'new') {
+      URL.revokeObjectURL(item.url)
+    }
+
+    galleryItems = galleryItems.filter((entry) => entry !== item)
+  }
+
+  function moveImage(index, offset) {
+    const nextIndex = index + offset
+
+    if (nextIndex < 0 || nextIndex >= galleryItems.length) {
+      return
+    }
+
+    const nextItems = [...galleryItems]
+    const [item] = nextItems.splice(index, 1)
+    nextItems.splice(nextIndex, 0, item)
+    galleryItems = nextItems
+  }
+
   function submitForm() {
     dispatch('submit', {
       type,
@@ -58,6 +132,13 @@
       priceMode,
       priceValue,
       serviceTerms: selectedServiceTerms,
+      imageOrder: galleryItems.map((item) => (
+        item.kind === 'existing'
+          ? { type: 'existing', id: item.id }
+          : { type: 'new', clientId: item.clientId }
+      )),
+      newImageClientIds: galleryItems.filter((item) => item.kind === 'new').map((item) => item.clientId),
+      images: galleryItems.filter((item) => item.kind === 'new').map((item) => item.file),
     })
   }
 </script>
@@ -131,6 +212,51 @@
       {/each}
     </div>
   </fieldset>
+
+  <div class="full-width stack-gap media-manager">
+    <div class="section-heading">
+      <h2>Galerie</h2>
+      <p>Ajoute jusqu’à 10 images et ajuste leur ordre d’affichage.</p>
+    </div>
+
+    <label class="upload-dropzone">
+      <span>Déposer ou sélectionner des images</span>
+      <small>Formats acceptés: svg, png, avif, jpg, jpeg, webp.</small>
+      <input type="file" accept=".svg,.png,.avif,.jpg,.jpeg,.webp,image/*" multiple on:change={handleImagesSelected} />
+    </label>
+
+    {#if galleryItems.length}
+      <div class="image-manager-grid">
+        {#each galleryItems as item, index}
+          <article class="managed-image-card">
+            <img src={item.url} alt={item.label} />
+            <div class="managed-image-body">
+              <strong>{index + 1}. {item.label}</strong>
+              <div class="action-row compact-row">
+                <button class="ghost-button" type="button" on:click={() => moveImage(index, -1)} disabled={index === 0}>
+                  ←
+                </button>
+                <button class="ghost-button" type="button" on:click={() => moveImage(index, 1)} disabled={index === galleryItems.length - 1}>
+                  →
+                </button>
+                <button class="ghost-button danger-button" type="button" on:click={() => removeImage(item)}>
+                  Retirer
+                </button>
+              </div>
+            </div>
+          </article>
+        {/each}
+      </div>
+    {:else}
+      <div class="empty-media-state">
+        <p>Aucune image pour l’instant. L’annonce restera visible avec un fallback visuel propre.</p>
+      </div>
+    {/if}
+
+    {#if imageMessage}
+      <p class="error-text">{imageMessage}</p>
+    {/if}
+  </div>
 
   <button class="primary-button full-width" type="submit">{submitLabel}</button>
 </form>

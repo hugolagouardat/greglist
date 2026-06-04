@@ -44,7 +44,7 @@
       }
       const updatedAd = await updateAd(adId, payload, $auth.token)
       statusMessage = `Annonce mise a jour: ${updatedAd.title}.`
-      navigate('/profile')
+      navigate(`/ads/${adId}`)
     } catch (error) {
       errorMessage = error.message
     } finally {
@@ -64,7 +64,7 @@
   }
 </script>
 
-<p class="summary">Modifie le contenu de ton annonce. La publication et la depubllication restent des actions explicites depuis le profil.</p>
+<p class="summary">Modifie le contenu, la galerie et l’ordre d’affichage de ton annonce sans perdre le contrôle de sa publication.</p>
 
 <div class="placeholder-card stack-gap">
   {#if isLoading}

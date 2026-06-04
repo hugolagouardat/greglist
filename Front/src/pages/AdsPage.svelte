@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { getAds } from '../lib/api.js'
   import { adCategories, formatCategory, formatPrice, formatServiceTerms } from '../lib/adOptions.js'
+  import { formatAdType, getAvatarUrl, getCoverImage } from '../lib/media.js'
   import { navigate } from '../lib/router.js'
 
   export const title = 'Annonces'
@@ -43,10 +44,19 @@
   $: void search, void type, void category, void city, void sort, loadAds()
 </script>
 
-<p class="summary">Parcours les annonces publiees, recherche par mots-cles, filtre par type ou categorie, et trie les resultats par date ou tarif.</p>
+<div class="hero-banner">
+  <div>
+    <p class="summary">Parcours les annonces publiées, trouve un service de proximité ou un coup de main ciblé, puis ouvre une conversation privée en quelques clics.</p>
+    <div class="hero-metrics">
+      <span>{ads.length} annonce{ads.length > 1 ? 's' : ''} visible{ads.length > 1 ? 's' : ''}</span>
+      <span>Jusqu’à 10 images par annonce</span>
+      <span>Messagerie privée intégrée</span>
+    </div>
+  </div>
+</div>
 
 <section class="stack-gap">
-  <div class="placeholder-card">
+  <div class="placeholder-card filters-panel">
     <div class="form-grid">
       <label>
         <span>Recherche</span>
@@ -84,7 +94,7 @@
     </div>
   </div>
 
-  <div class="card-grid">
+  <div class="card-grid listing-grid">
     {#if isLoading}
       <article class="placeholder-card">
         <p>Chargement des annonces...</p>
@@ -93,22 +103,58 @@
       <article class="placeholder-card">
         <p class="error-text">{errorMessage}</p>
       </article>
+    {:else if !ads.length}
+      <article class="placeholder-card empty-state-card">
+        <p>Aucune annonce ne correspond à ces filtres pour le moment.</p>
+      </article>
     {:else}
       {#each ads as ad}
-      <article class="listing-card">
-        <p class="pill">{ad.type === 'OFFER' ? 'Offre' : 'Demande'}</p>
-        <h2>{ad.title}</h2>
-        <p>{ad.description}</p>
-        <div class="card-meta">
-          <span>{formatCategory(ad.category)}</span>
-          <span>{ad.city}</span>
-          <span>{formatPrice(ad)}</span>
-          <span>{formatServiceTerms(ad.serviceTerms)}</span>
-        </div>
-        <button class="primary-button" type="button" on:click={() => navigate(`/ads/${ad.id}`)}>
-          Voir l’annonce
-        </button>
-      </article>
+        <article class="listing-card interactive-card">
+          <div class="listing-media">
+            {#if getCoverImage(ad)}
+              <img src={getCoverImage(ad).url} alt={ad.title} />
+            {:else}
+              <div class="fallback-media">
+                <strong>{ad.title.slice(0, 1)}</strong>
+                <span>Sans image</span>
+              </div>
+            {/if}
+          </div>
+
+          <div class="listing-card-body">
+            <div class="card-row-between">
+              <p class="pill">{formatAdType(ad.type)}</p>
+              <span class="muted-chip">{formatPrice(ad)}</span>
+            </div>
+
+            <div class="stack-gap compact-gap">
+              <h2>{ad.title}</h2>
+              <p class="card-excerpt">{ad.description}</p>
+            </div>
+
+            <div class="card-meta">
+              <span>{formatCategory(ad.category)}</span>
+              <span>{ad.city}</span>
+              <span>{formatServiceTerms(ad.serviceTerms)}</span>
+            </div>
+
+            <div class="owner-inline">
+              {#if getAvatarUrl(ad.owner)}
+                <img src={getAvatarUrl(ad.owner)} alt={ad.owner?.pseudo || 'Profil'} class="avatar-thumb" />
+              {:else}
+                <div class="avatar-fallback avatar-thumb">{ad.owner?.pseudo?.slice(0, 1) || '?'}</div>
+              {/if}
+              <div>
+                <strong>{ad.owner?.pseudo || 'Membre Greglist'}</strong>
+                <small>{ad.owner?.city || ad.city}</small>
+              </div>
+            </div>
+
+            <button class="primary-button" type="button" on:click={() => navigate(`/ads/${ad.id}`)}>
+              Voir l’annonce
+            </button>
+          </div>
+        </article>
       {/each}
     {/if}
   </div>

@@ -1,4 +1,5 @@
 <script>
+  import logoUrl from './assets/greglist-logo.svg'
   import { auth, isAuthenticated } from './lib/stores/auth.js'
   import { logoutUser } from './lib/api.js'
   import { navigate, route } from './lib/router.js'
@@ -6,7 +7,6 @@
   import AdDetailPage from './pages/AdDetailPage.svelte'
   import ConversationPage from './pages/ConversationPage.svelte'
   import EditAdPage from './pages/EditAdPage.svelte'
-  import HomePage from './pages/HomePage.svelte'
   import InboxPage from './pages/InboxPage.svelte'
   import LoginPage from './pages/LoginPage.svelte'
   import NewAdPage from './pages/NewAdPage.svelte'
@@ -14,15 +14,13 @@
   import RegisterPage from './pages/RegisterPage.svelte'
 
   const guestLinks = [
-    { href: '/', label: 'Accueil' },
-    { href: '/ads', label: 'Annonces' },
+    { href: '/', label: 'Annonces' },
     { href: '/login', label: 'Connexion' },
     { href: '/register', label: 'Inscription' },
   ]
 
   const authenticatedLinks = [
-    { href: '/', label: 'Accueil' },
-    { href: '/ads', label: 'Annonces' },
+    { href: '/', label: 'Annonces' },
     { href: '/ads/new', label: 'Nouvelle annonce' },
     { href: '/profile', label: 'Profil' },
     { href: '/inbox', label: 'Inbox' },
@@ -57,11 +55,7 @@
   }
 
   function resolveView(currentRoute) {
-    if (currentRoute.path === '/') {
-      return { page: 'home', title: 'Accueil' }
-    }
-
-    if (currentRoute.path === '/ads') {
+    if (currentRoute.path === '/' || currentRoute.path === '/ads') {
       return { page: 'ads', title: 'Annonces' }
     }
 
@@ -109,7 +103,7 @@
       return { page: 'register', title: 'Inscription' }
     }
 
-    return { page: 'home', title: 'Accueil' }
+    return { page: 'ads', title: 'Annonces' }
   }
 
   $: view = resolveView($route)
@@ -122,7 +116,11 @@
 <div class="shell">
   <header class="topbar">
     <a href="/" class="brand" on:click={(event) => onNavigate(event, '/')}>
-      Greglist
+      <img src={logoUrl} alt="Greglist" class="brand-logo" />
+      <span class="brand-copy">
+        <strong>Greglist</strong>
+        <small>Services de quartier, sans détour.</small>
+      </span>
     </a>
 
     <nav class="menu" aria-label="Navigation principale">
@@ -144,15 +142,13 @@
 
   <main class="viewport">
     <section class="page-frame">
-      <p class="eyebrow">Greglist</p>
+      <p class="eyebrow">Marketplace locale</p>
       <h1>{view.title}</h1>
 
       {#if !$auth.ready}
         <div class="placeholder-card">
           <p>Chargement de la session...</p>
         </div>
-      {:else if view.page === 'home'}
-        <HomePage />
       {:else if view.page === 'ads'}
         <AdsPage />
       {:else if view.page === 'new-ad'}
