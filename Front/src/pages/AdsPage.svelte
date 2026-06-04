@@ -15,27 +15,17 @@
   let ads = []
   let isLoading = false
   let errorMessage = ''
-  let requestId = 0
 
   async function loadAds() {
-    const currentRequestId = ++requestId
     isLoading = true
     errorMessage = ''
 
     try {
-      const nextAds = await getAds({ search, type, category, city, sort })
-
-      if (currentRequestId === requestId) {
-        ads = nextAds
-      }
+      ads = await getAds({ search, type, category, city, sort })
     } catch (error) {
-      if (currentRequestId === requestId) {
-        errorMessage = error.message
-      }
+      errorMessage = error.message
     } finally {
-      if (currentRequestId === requestId) {
-        isLoading = false
-      }
+      isLoading = false
     }
   }
 

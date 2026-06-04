@@ -195,7 +195,7 @@ test("rejects creating an ad with more than ten images", async () => {
   }
 
   const response = await createRequest.expect(400);
-  assert.equal(response.body.error, "You can upload up to 10 images");
+  assert.equal(response.body.error, "Maximum 10 images par annonce");
 });
 
 test("updates ad images, removes files from disk, and cleans up every image on ad deletion", async () => {

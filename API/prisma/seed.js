@@ -173,7 +173,7 @@ function getMimeTypeForFilename(filename) {
   const mimeType = mimeTypeByExtension[extension];
 
   if (!mimeType) {
-    throw new Error(`Unsupported seed asset extension: ${filename}`);
+    throw new Error(`Extension non supportee: ${filename}`);
   }
 
   return mimeType;
@@ -321,7 +321,7 @@ async function main() {
     });
   }
 
-  console.log(`Seed completed: ${users.length} test users and ${demoAds.length} published ads are available.`);
+  console.log(`Seed termine: ${users.length} comptes de test et ${demoAds.length} annonces publiees.`);
 }
 
 main()

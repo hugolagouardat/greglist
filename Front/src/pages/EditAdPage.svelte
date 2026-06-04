@@ -13,12 +13,9 @@
   let isSubmitting = false
   let errorMessage = ''
   let statusMessage = ''
-  let loadKey = ''
 
   async function loadAd() {
-    if (!$isAuthenticated) {
-      return
-    }
+    if (!$isAuthenticated) return
 
     isLoading = true
     errorMessage = ''
@@ -53,15 +50,6 @@
   }
 
   onMount(loadAd)
-
-  $: {
-    const nextLoadKey = `${adId}:${$auth.ready ? $auth.token : 'pending'}`
-
-    if ($auth.ready && nextLoadKey !== loadKey) {
-      loadKey = nextLoadKey
-      loadAd()
-    }
-  }
 </script>
 
 <p class="summary">Modifie le contenu, la galerie et l’ordre d’affichage de ton annonce sans perdre le contrôle de sa publication.</p>

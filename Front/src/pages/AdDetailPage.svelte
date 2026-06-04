@@ -13,14 +13,13 @@
   let isLoading = true
   let isSubmitting = false
   let errorMessage = ''
-  let loadKey = ''
   let selectedImageIndex = 0
-  let isLightboxOpen = false
 
   $: isOwner = Boolean(ad && $auth.user?.id === ad.ownerId)
   $: currentImage = ad?.images?.[selectedImageIndex] || null
 
   async function loadAd() {
+    if (!$auth.ready) return
     isLoading = true
     errorMessage = ''
 
@@ -34,14 +33,7 @@
     }
   }
 
-      $: {
-        const nextLoadKey = `${adId}:${$auth.ready ? $auth.token : 'pending'}`
-
-        if ($auth.ready && nextLoadKey !== loadKey) {
-          loadKey = nextLoadKey
-          loadAd()
-        }
-      }
+  $: if ($auth.ready) loadAd()
 
   async function handlePublish() {
     try {
@@ -99,10 +91,6 @@
 
   onMount(loadAd)
 
-  $: if (adId) {
-    loadAd()
-  }
-
   function showPreviousImage() {
     if (!ad?.images?.length) {
       return
@@ -118,42 +106,7 @@
 
     selectedImageIndex = selectedImageIndex === ad.images.length - 1 ? 0 : selectedImageIndex + 1
   }
-
-  function openLightbox(index = selectedImageIndex) {
-    if (!ad?.images?.length) {
-      return
-    }
-
-    selectedImageIndex = index
-    isLightboxOpen = true
-  }
-
-  function closeLightbox() {
-    isLightboxOpen = false
-  }
-
-  function handleWindowKeydown(event) {
-    if (!isLightboxOpen) {
-      return
-    }
-
-    if (event.key === 'Escape') {
-      closeLightbox()
-      return
-    }
-
-    if (event.key === 'ArrowLeft') {
-      showPreviousImage()
-      return
-    }
-
-    if (event.key === 'ArrowRight') {
-      showNextImage()
-    }
-  }
 </script>
-
-<svelte:window on:keydown={handleWindowKeydown} />
 
 <p class="summary">Consulte la galerie complète, repère le propriétaire d’un coup d’œil, puis ouvre un premier contact privé directement depuis la fiche.</p>
 
@@ -170,9 +123,7 @@
     <article class="placeholder-card stack-gap detail-primary-card">
       <div class="detail-stage">
         {#if currentImage}
-          <button class="hero-media-button" type="button" on:click={() => openLightbox(selectedImageIndex)} aria-label="Ouvrir l'image en plein écran">
-            <img src={currentImage.url} alt={ad.title} class="detail-hero-image" />
-          </button>
+          <img src={currentImage.url} alt={ad.title} class="detail-hero-image" />
         {:else}
           <div class="fallback-media detail-fallback-media">
             <strong>{ad.title.slice(0, 1)}</strong>
@@ -208,7 +159,6 @@
               class="thumbnail-button"
               type="button"
               on:click={() => (selectedImageIndex = index)}
-              on:dblclick={() => openLightbox(index)}
               aria-label={`Afficher l'image ${index + 1}`}
             >
               <img src={image.url} alt={`${ad.title} ${index + 1}`} />
@@ -267,43 +217,3 @@
   </aside>
   {/if}
 </section>
-
-{#if isLightboxOpen && currentImage}
-  <div class="lightbox-backdrop">
-    <button class="lightbox-scrim" type="button" aria-label="Fermer la galerie" on:click={closeLightbox}></button>
-    <div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="Galerie plein écran">
-      <div class="lightbox-topbar">
-        <p>
-          Image {selectedImageIndex + 1} / {ad.images.length}
-        </p>
-        <button class="ghost-button lightbox-close" type="button" on:click={closeLightbox}>Fermer</button>
-      </div>
-
-      <div class="lightbox-stage">
-        <button class="ghost-button lightbox-nav" type="button" on:click={showPreviousImage} aria-label="Image précédente">
-          Precedente
-        </button>
-        <img src={currentImage.url} alt={`${ad.title} ${selectedImageIndex + 1}`} class="lightbox-image" />
-        <button class="ghost-button lightbox-nav" type="button" on:click={showNextImage} aria-label="Image suivante">
-          Suivante
-        </button>
-      </div>
-
-      {#if ad.images.length > 1}
-        <div class="lightbox-thumbnail-rail">
-          {#each ad.images as image, index}
-            <button
-              class:active-thumb={index === selectedImageIndex}
-              class="thumbnail-button lightbox-thumbnail"
-              type="button"
-              on:click={() => (selectedImageIndex = index)}
-              aria-label={`Selectionner l'image ${index + 1}`}
-            >
-              <img src={image.url} alt={`${ad.title} miniature ${index + 1}`} />
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  </div>
-{/if}

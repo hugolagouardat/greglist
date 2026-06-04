@@ -1,23 +1,9 @@
 const { AD_KIND, DEFAULT_PROFILE_STORAGE_KEY, PROFILE_KIND, buildAssetUrl } = require("./assets");
 
 function toNumber(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === "number") {
-    return value;
-  }
-
-  if (typeof value?.toNumber === "function") {
-    return value.toNumber();
-  }
-
-  if (typeof value?.toString === "function" && typeof value === "object") {
-    return Number(value.toString());
-  }
-
-  return Number(value);
+  if (value == null) return null
+  if (typeof value === "number") return value
+  return parseFloat(String(value))
 }
 
 function serializeAvatar(avatar, request) {

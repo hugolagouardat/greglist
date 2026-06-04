@@ -1,7 +1,7 @@
 <script>
+  import { onMount } from 'svelte'
   import { getConversationMessages, sendConversationMessage } from '../lib/api.js'
   import { auth, isAuthenticated } from '../lib/stores/auth.js'
-  import { onDestroy, onMount, tick } from 'svelte'
 
   export let conversationId
   export const title = 'Conversation'
@@ -11,77 +11,20 @@
   let isLoading = false
   let isSubmitting = false
   let errorMessage = ''
-  let loadKey = ''
-  let isRequestInFlight = false
-  let pollTimer = null
-  let threadElement
 
-  async function scrollToLatestMessage() {
-    await tick()
+  async function loadConversation() {
+    if (!$isAuthenticated) return
 
-    if (threadElement) {
-      threadElement.scrollTop = threadElement.scrollHeight
-    }
-  }
-
-  async function loadConversation({ background = false } = {}) {
-    if (!$isAuthenticated) {
-      return
-    }
-
-    if (isRequestInFlight) {
-      return
-    }
-
-    if (!background) {
-      isLoading = true
-    }
-
-    isRequestInFlight = true
-
-    if (!background) {
-      errorMessage = ''
-    }
+    isLoading = true
+    errorMessage = ''
 
     try {
-      const nextConversation = await getConversationMessages(conversationId, $auth.token)
-      const previousLastMessageId = conversation?.messages?.at(-1)?.id
-
-      conversation = nextConversation
-
-      if (nextConversation.messages.length && nextConversation.messages.at(-1)?.id !== previousLastMessageId) {
-        await scrollToLatestMessage()
-      }
+      conversation = await getConversationMessages(conversationId, $auth.token)
     } catch (error) {
       errorMessage = error.message
     } finally {
-      isRequestInFlight = false
-
-      if (!background) {
-        isLoading = false
-      }
+      isLoading = false
     }
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      window.clearInterval(pollTimer)
-      pollTimer = null
-    }
-  }
-
-  function startPolling() {
-    stopPolling()
-
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    pollTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void loadConversation({ background: true })
-      }
-    }, 2500)
   }
 
   async function handleReply() {
@@ -104,34 +47,10 @@
     }
   }
 
-  function handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      void loadConversation({ background: true })
-    }
-  }
-
-  onMount(() => {
-    void loadConversation()
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-  })
-
-  onDestroy(() => {
-    stopPolling()
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
-  })
-
-  $: {
-    const nextLoadKey = `${conversationId}:${$auth.ready ? $auth.token : 'pending'}`
-
-    if ($auth.ready && nextLoadKey !== loadKey) {
-      loadKey = nextLoadKey
-      void loadConversation()
-    }
-  }
+  onMount(loadConversation)
 </script>
 
-<p class="summary">Chaque conversation reste strictement privee entre les deux participants de l’annonce et se rafraichit automatiquement pour afficher les nouveaux messages presque en temps reel.</p>
+<p class="summary">Chaque conversation reste privee entre les deux participants de l’annonce.</p>
 
 <section class="stack-gap">
   {#if !$isAuthenticated}
@@ -154,7 +73,7 @@
       </p>
     </div>
 
-    <div class="thread-list" bind:this={threadElement}>
+    <div class="thread-list">
       {#each conversation.messages as message}
         <article class:thread-bubble={true} class:mine={message.senderId === $auth.user?.id}>
           <strong>{message.senderId === $auth.user?.id ? 'Moi' : 'Interlocuteur'}</strong>

@@ -37,7 +37,7 @@
         await logoutUser($auth.token)
       }
     } catch {
-      // keep local logout even if backend logout fails
+      // on deconnecte quand meme en local si l'API echoue
     }
 
     auth.clearSession()
@@ -67,7 +67,7 @@
       return {
         page: 'ad-detail',
         title: 'Détail d’annonce',
-        adId: Number.parseInt(currentRoute.path.split('/')[2], 10),
+        adId: parseInt(currentRoute.path.split('/')[2], 10),
       }
     }
 
@@ -75,7 +75,7 @@
       return {
         page: 'edit-ad',
         title: 'Modifier une annonce',
-        adId: Number.parseInt(currentRoute.path.split('/')[2], 10),
+        adId: parseInt(currentRoute.path.split('/')[2], 10),
       }
     }
 
@@ -91,7 +91,7 @@
       return {
         page: 'conversation',
         title: 'Conversation',
-        conversationId: Number.parseInt(currentRoute.path.split('/')[2], 10),
+        conversationId: parseInt(currentRoute.path.split('/')[2], 10),
       }
     }
 

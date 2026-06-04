@@ -67,7 +67,7 @@ function assertAllowedImageFile(file) {
   const extension = getExtensionForFile(file);
 
   if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype) || !extension) {
-    const error = new Error("Unsupported image format");
+    const error = new Error("Format d'image non supporté");
     error.statusCode = 400;
     throw error;
   }
@@ -114,15 +114,9 @@ async function deleteManagedAsset(kind, storageKey) {
 
   const directory = getDirectoryForKind(kind);
   const filePath = path.join(directory, storageKey);
-  const resolvedDirectory = path.resolve(directory);
-  const resolvedFilePath = path.resolve(filePath);
-
-  if (!resolvedFilePath.startsWith(`${resolvedDirectory}${path.sep}`)) {
-    return;
-  }
 
   try {
-    await fs.unlink(resolvedFilePath);
+    await fs.unlink(filePath);
   } catch (error) {
     if (error.code !== "ENOENT") {
       throw error;
