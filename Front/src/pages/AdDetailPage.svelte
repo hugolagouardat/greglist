@@ -108,8 +108,6 @@
   }
 </script>
 
-<p class="summary">Consulte la galerie complète, repère le propriétaire d’un coup d’œil, puis ouvre un premier contact privé directement depuis la fiche.</p>
-
 <section class="detail-layout">
   {#if isLoading}
     <article class="placeholder-card">
@@ -176,13 +174,28 @@
         <p>{ad.description}</p>
       </div>
 
-      <div class="card-meta detail-meta">
-        <span>{formatCategory(ad.category)}</span>
-        <span>{ad.city}</span>
-        <span>{formatPrice(ad)}</span>
-        <span>{ad.availability || 'Disponibilité à préciser'}</span>
-        <span>{formatServiceTerms(ad.serviceTerms)}</span>
-      </div>
+      <dl class="detail-facts">
+        <div>
+          <dt>Catégorie</dt>
+          <dd>{formatCategory(ad.category)}</dd>
+        </div>
+        <div>
+          <dt>Ville</dt>
+          <dd>{ad.city}</dd>
+        </div>
+        <div>
+          <dt>Tarif</dt>
+          <dd>{formatPrice(ad)}</dd>
+        </div>
+        <div>
+          <dt>Disponibilité</dt>
+          <dd>{ad.availability || 'À préciser'}</dd>
+        </div>
+        <div>
+          <dt>Modalités</dt>
+          <dd>{formatServiceTerms(ad.serviceTerms)}</dd>
+        </div>
+      </dl>
 
       {#if isOwner}
         <div class="action-row">
@@ -199,13 +212,13 @@
       {/if}
     </article>
 
-  <aside class="placeholder-card stack-gap">
+  <aside class="placeholder-card stack-gap contact-card">
     {#if isOwner}
       <h2>Gestion</h2>
       <p>Cette annonce t’appartient. Tu peux y revenir pour ajuster la galerie, corriger le texte ou gérer sa publication.</p>
     {:else}
-      <h2>Contact</h2>
-      <p>{formatServiceTerms(ad.serviceTerms)}</p>
+      <h2>Contacter {ad.owner?.pseudo || 'le membre'}</h2>
+      <p>Pose ta question ou propose un créneau. La conversation reste privée entre vous deux.</p>
       <textarea bind:value={firstMessage} rows="5" placeholder="Votre premier message"></textarea>
       <button class="primary-button" type="button" on:click={handleFirstMessage} disabled={isSubmitting}>
         {isSubmitting ? 'Envoi...' : 'Envoyer un message'}

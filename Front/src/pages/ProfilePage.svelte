@@ -12,7 +12,7 @@
     updateCurrentUser,
     uploadAvatar,
   } from '../lib/api.js'
-  import { formatCategory, formatPrice, formatPriceMode, formatServiceTerms } from '../lib/adOptions.js'
+  import { formatCategory, formatPrice, formatServiceTerm } from '../lib/adOptions.js'
   import { auth, isAuthenticated } from '../lib/stores/auth.js'
   import { formatAdType, getAvatarUrl, getCoverImage } from '../lib/media.js'
   import { navigate } from '../lib/router.js'
@@ -315,13 +315,12 @@
                 <p class="card-excerpt">{ad.description}</p>
 
                 <div class="card-meta">
-                  <span>{formatCategory(ad.category)}</span>
-                  <span>{ad.city}</span>
-                  <span>{formatPrice(ad)}</span>
-                  {#if ad.priceMode !== 'FREE'}
-                    <span>{formatPriceMode(ad.priceMode)}</span>
-                  {/if}
-                  <span>{formatServiceTerms(ad.serviceTerms)}</span>
+                  <span class="meta-chip meta-chip-category">{formatCategory(ad.category)}</span>
+                  <span class="meta-chip meta-chip-city">{ad.city}</span>
+                  <span class="meta-chip">{formatPrice(ad)}</span>
+                  {#each ad.serviceTerms as term}
+                    <span class="meta-chip">{formatServiceTerm(term)}</span>
+                  {/each}
                 </div>
 
                 <div class="action-row">

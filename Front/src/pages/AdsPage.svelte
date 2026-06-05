@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { getAds } from '../lib/api.js'
-  import { adCategories, formatCategory, formatPrice, formatServiceTerms } from '../lib/adOptions.js'
+  import { adCategories, formatCategory, formatPrice, formatServiceTerm } from '../lib/adOptions.js'
   import { formatAdType, getAvatarUrl, getCoverImage } from '../lib/media.js'
   import { navigate } from '../lib/router.js'
 
@@ -35,14 +35,7 @@
 </script>
 
 <div class="hero-banner">
-  <div>
-    <p class="summary">Parcours les annonces publiées, trouve un service de proximité ou un coup de main ciblé, puis ouvre une conversation privée en quelques clics.</p>
-    <div class="hero-metrics">
-      <span>{ads.length} annonce{ads.length > 1 ? 's' : ''} visible{ads.length > 1 ? 's' : ''}</span>
-      <span>Jusqu’à 10 images par annonce</span>
-      <span>Messagerie privée intégrée</span>
-    </div>
-  </div>
+  <p class="summary">Parcours les annonces publiées près de chez toi : propose un service ou trouve le bon coup de main, puis ouvre une conversation privée en un clic.</p>
 </div>
 
 <section class="stack-gap">
@@ -123,9 +116,11 @@
             </div>
 
             <div class="card-meta">
-              <span>{formatCategory(ad.category)}</span>
-              <span>{ad.city}</span>
-              <span>{formatServiceTerms(ad.serviceTerms)}</span>
+              <span class="meta-chip meta-chip-category">{formatCategory(ad.category)}</span>
+              <span class="meta-chip meta-chip-city">{ad.city}</span>
+              {#each ad.serviceTerms as term}
+                <span class="meta-chip">{formatServiceTerm(term)}</span>
+              {/each}
             </div>
 
             <div class="owner-inline">

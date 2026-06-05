@@ -30,10 +30,10 @@
 
   function getCounterpart(conversation) {
     if (conversation.ownerId === $auth.user?.id) {
-      return conversation.participant?.pseudo || 'Interlocuteur'
+      return conversation.participant?.pseudo || 'Membre'
     }
 
-    return conversation.owner?.pseudo || 'Interlocuteur'
+    return conversation.owner?.pseudo || 'Membre'
   }
 
   onMount(loadConversations)
@@ -60,15 +60,14 @@
     </article>
   {:else}
     {#each conversations as conversation}
-      <article class="listing-card">
-        <div class="card-meta">
-          <span>{conversation.ad?.title || `Annonce ${conversation.adId}`}</span>
-          <span>{getCounterpart(conversation)}</span>
-          <span>{new Date(conversation.updatedAt).toLocaleString('fr-FR')}</span>
+      <article class="listing-card inbox-card">
+        <div class="card-row-between">
+          <h2>{getCounterpart(conversation)}</h2>
+          <small class="muted-date">{new Date(conversation.updatedAt).toLocaleString('fr-FR')}</small>
         </div>
-        <h2>Conversation privee</h2>
-        <p>{conversation.messages[0]?.content || 'Aucun message pour le moment.'}</p>
-        <button class="primary-button" type="button" on:click={() => navigate(`/conversations/${conversation.id}`)}>
+        <span class="meta-chip meta-chip-city">{conversation.ad?.title || `Annonce ${conversation.adId}`}</span>
+        <p class="card-excerpt">{conversation.messages[0]?.content || 'Aucun message pour le moment.'}</p>
+        <button class="primary-button inline-button" type="button" on:click={() => navigate(`/conversations/${conversation.id}`)}>
           Ouvrir la conversation
         </button>
       </article>

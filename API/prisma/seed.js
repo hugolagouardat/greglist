@@ -6,7 +6,6 @@ const prisma = require("../src/lib/prisma");
 const { hashPassword } = require("../src/utils/hash");
 const { AD_DIRECTORY, PROFILE_DIRECTORY, ensureStorageDirectories } = require("../src/utils/assets");
 
-const profileFixturesDirectory = path.join(__dirname, "..", "src", "img", "profile", "default");
 const adFixturesDirectory = path.join(__dirname, "..", "src", "img", "annonce");
 
 const mimeTypeByExtension = {
@@ -24,28 +23,24 @@ const demoUsers = [
     city: "Paris",
     bio: "Propose des services de jardinage et d'aide a domicile.",
     password: "secret987",
-    avatarSource: "pixelArt-1778333456034.svg",
   },
   {
     pseudo: "emma",
     city: "Lyon",
     bio: "Recherche des services ponctuels et depannages locaux.",
     password: "secret654",
-    avatarSource: "pixelArt-1778341795618.jpg",
   },
   {
     pseudo: "leo",
     city: "Bordeaux",
     bio: "Donne des cours et aide sur les outils numeriques.",
     password: "secret321",
-    avatarSource: "pixelArt-1778341783265.png",
   },
   {
     pseudo: "nora",
     city: "Nantes",
     bio: "Disponible pour evenements, livraisons et petits services du quotidien.",
     password: "secret159",
-    avatarSource: "pixelArt-1778341799265.webp",
   },
 ];
 
@@ -189,53 +184,25 @@ async function copySeedAsset(sourceDirectory, destinationDirectory, sourceName, 
   };
 }
 
-async function resetDemoAssets(users, userIds) {
-  const avatars = await prisma.userAvatar.findMany({
-    where: { userId: { in: userIds } },
-    select: { storageKey: true },
-  });
-
-  const adImages = await prisma.adImage.findMany({
-    where: {
-      ad: {
-        ownerId: { in: userIds },
-      },
-    },
-    select: { storageKey: true },
-  });
+async function resetDemoAssets(userIds) {
+  const [avatars, adImages] = await Promise.all([
+    prisma.userAvatar.findMany({
+      where: { userId: { in: userIds } },
+      select: { storageKey: true },
+    }),
+    prisma.adImage.findMany({
+      where: { ad: { ownerId: { in: userIds } } },
+      select: { storageKey: true },
+    }),
+  ]);
 
   await Promise.all([
     ...avatars.map((avatar) => fs.rm(path.join(PROFILE_DIRECTORY, avatar.storageKey), { force: true })),
     ...adImages.map((image) => fs.rm(path.join(AD_DIRECTORY, image.storageKey), { force: true })),
-    ...users.map((user) => {
-      const extension = path.extname(user.avatarSource);
-      return fs.rm(path.join(PROFILE_DIRECTORY, `seed-avatar-${user.pseudo}${extension}`), { force: true });
-    }),
-    ...demoAds.flatMap((ad, adIndex) => ad.imageSources.map((sourceName, imageIndex) => (
-      fs.rm(path.join(AD_DIRECTORY, `seed-ad-${adIndex + 1}-${imageIndex + 1}${path.extname(sourceName)}`), { force: true })
-    ))),
   ]);
-}
 
-async function seedUserAvatars(users) {
-  for (const user of users) {
-    const extension = path.extname(user.avatarSource).toLowerCase();
-    const copiedAsset = await copySeedAsset(
-      profileFixturesDirectory,
-      PROFILE_DIRECTORY,
-      user.avatarSource,
-      `seed-avatar-${user.pseudo}${extension}`,
-    );
-
-    await prisma.userAvatar.upsert({
-      where: { userId: user.id },
-      update: copiedAsset,
-      create: {
-        ...copiedAsset,
-        userId: user.id,
-      },
-    });
-  }
+  // Les comptes de demo piochent un avatar dans la bibliotheque par defaut: on retire les anciens avatars persistes
+  await prisma.userAvatar.deleteMany({ where: { userId: { in: userIds } } });
 }
 
 async function resetDemoAds(userIds) {
@@ -277,16 +244,13 @@ async function main() {
   const users = [];
 
   for (const demoUser of demoUsers) {
-    users.push({
-      ...(await upsertUser(demoUser)),
-      avatarSource: demoUser.avatarSource,
-    });
+    users.push(await upsertUser(demoUser));
   }
 
   const userIdByPseudo = new Map(users.map((user) => [user.pseudo, user.id]));
-  await resetDemoAssets(demoUsers, users.map((user) => user.id));
-  await resetDemoAds(users.map((user) => user.id));
-  await seedUserAvatars(users);
+  const userIds = users.map((user) => user.id);
+  await resetDemoAssets(userIds);
+  await resetDemoAds(userIds);
 
   for (const [adIndex, ad] of demoAds.entries()) {
     await prisma.ad.create({

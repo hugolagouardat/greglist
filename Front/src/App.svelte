@@ -2,6 +2,7 @@
   import logoUrl from './assets/greglist-logo.svg'
   import { auth, isAuthenticated } from './lib/stores/auth.js'
   import { logoutUser } from './lib/api.js'
+  import { getAvatarUrl } from './lib/media.js'
   import { navigate, route } from './lib/router.js'
   import AdsPage from './pages/AdsPage.svelte'
   import AdDetailPage from './pages/AdDetailPage.svelte'
@@ -22,7 +23,6 @@
   const authenticatedLinks = [
     { href: '/', label: 'Annonces' },
     { href: '/ads/new', label: 'Nouvelle annonce' },
-    { href: '/profile', label: 'Profil' },
     { href: '/inbox', label: 'Inbox' },
   ]
 
@@ -124,18 +124,36 @@
     </a>
 
     <nav class="menu" aria-label="Navigation principale">
-      {#each links as link}
-        <a
-          href={link.href}
-          class:active={$route.path === link.href}
-          on:click={(event) => onNavigate(event, link.href)}
-        >
-          {link.label}
-        </a>
-      {/each}
+      <div class="menu-links">
+        {#each links as link}
+          <a
+            href={link.href}
+            class:active={$route.path === link.href}
+            on:click={(event) => onNavigate(event, link.href)}
+          >
+            {link.label}
+          </a>
+        {/each}
+      </div>
 
       {#if $isAuthenticated}
-        <button class="ghost-button" type="button" on:click={handleLogout}>Déconnexion</button>
+        <div class="menu-user">
+          <button class="ghost-button logout-button" type="button" on:click={handleLogout}>Déconnexion</button>
+          <a
+            href="/profile"
+            class="nav-avatar"
+            class:active={$route.path === '/profile'}
+            on:click={(event) => onNavigate(event, '/profile')}
+            title="Mon profil"
+            aria-label="Mon profil"
+          >
+            {#if getAvatarUrl($auth.user)}
+              <img src={getAvatarUrl($auth.user)} alt={$auth.user?.pseudo || 'Profil'} />
+            {:else}
+              <span class="nav-avatar-fallback">{$auth.user?.pseudo?.slice(0, 1) || '?'}</span>
+            {/if}
+          </a>
+        </div>
       {/if}
     </nav>
   </header>

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { getConversationMessages, sendConversationMessage } from '../lib/api.js'
+  import { navigate } from '../lib/router.js'
   import { auth, isAuthenticated } from '../lib/stores/auth.js'
 
   export let conversationId
@@ -11,6 +12,10 @@
   let isLoading = false
   let isSubmitting = false
   let errorMessage = ''
+
+  $: otherName = conversation
+    ? (conversation.owner?.id === $auth.user?.id ? conversation.participant?.pseudo : conversation.owner?.pseudo) || 'Membre'
+    : ''
 
   async function loadConversation() {
     if (!$isAuthenticated) return
@@ -66,17 +71,25 @@
       <p class="error-text">{errorMessage}</p>
     </div>
   {:else if conversation}
-    <div class="placeholder-card stack-gap">
-      <h2>{conversation.ad?.title || `Annonce ${conversation.adId}`}</h2>
-      <p>
-        Conversation entre {conversation.owner?.pseudo} et {conversation.participant?.pseudo}.
-      </p>
+    <div class="placeholder-card conversation-header">
+      <div class="conversation-heading">
+        <span class="conversation-eyebrow">Conversation avec</span>
+        <h2>{otherName}</h2>
+      </div>
+      {#if conversation.ad}
+        <a
+          href={`/ads/${conversation.ad.id}`}
+          class="conversation-ad-link"
+          on:click={(event) => { event.preventDefault(); navigate(`/ads/${conversation.ad.id}`) }}
+        >
+          {conversation.ad.title}
+        </a>
+      {/if}
     </div>
 
     <div class="thread-list">
       {#each conversation.messages as message}
         <article class:thread-bubble={true} class:mine={message.senderId === $auth.user?.id}>
-          <strong>{message.senderId === $auth.user?.id ? 'Moi' : 'Interlocuteur'}</strong>
           <p>{message.content}</p>
           <small>{new Date(message.createdAt).toLocaleString('fr-FR')}</small>
         </article>

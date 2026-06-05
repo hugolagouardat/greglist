@@ -1,4 +1,5 @@
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 
@@ -17,6 +18,45 @@ const MIME_TO_EXTENSION = new Map([
 ]);
 const ALLOWED_IMAGE_MIME_TYPES = new Set(MIME_TO_EXTENSION.keys());
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".svg", ".png", ".avif", ".jpg", ".jpeg", ".webp"]);
+const EXTENSION_TO_MIME = new Map([
+  [".svg", "image/svg+xml"],
+  [".png", "image/png"],
+  [".avif", "image/avif"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".webp", "image/webp"],
+]);
+
+const DEFAULT_PROFILE_DIRECTORY = path.join(PROFILE_DIRECTORY, "default");
+
+// Liste les avatars de la bibliotheque par defaut (ordre stable)
+function listDefaultProfileKeys() {
+  try {
+    return fsSync
+      .readdirSync(DEFAULT_PROFILE_DIRECTORY)
+      .filter((name) => ALLOWED_IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase()))
+      .sort()
+      .map((name) => `default/${name}`);
+  } catch {
+    return [];
+  }
+}
+
+const DEFAULT_PROFILE_KEYS = listDefaultProfileKeys();
+
+function mimeTypeForStorageKey(storageKey) {
+  return EXTENSION_TO_MIME.get(path.extname(storageKey).toLowerCase()) || "application/octet-stream";
+}
+
+// Choisit un avatar par defaut stable dans la bibliotheque a partir d'une graine (ex: id utilisateur)
+function pickDefaultProfileKey(seed) {
+  if (DEFAULT_PROFILE_KEYS.length === 0) {
+    return DEFAULT_PROFILE_STORAGE_KEY;
+  }
+
+  const numericSeed = Number.isFinite(Number(seed)) ? Math.abs(Math.trunc(Number(seed))) : 0;
+  return DEFAULT_PROFILE_KEYS[numericSeed % DEFAULT_PROFILE_KEYS.length];
+}
 
 const directoryByKind = {
   [PROFILE_KIND]: PROFILE_DIRECTORY,
@@ -132,6 +172,7 @@ module.exports = {
   AD_DIRECTORY,
   AD_KIND,
   ALLOWED_IMAGE_MIME_TYPES,
+  DEFAULT_PROFILE_KEYS,
   DEFAULT_PROFILE_STORAGE_KEY,
   PROFILE_DIRECTORY,
   PROFILE_KIND,
@@ -139,5 +180,7 @@ module.exports = {
   deleteManagedAsset,
   deleteManagedAssets,
   ensureStorageDirectories,
+  mimeTypeForStorageKey,
+  pickDefaultProfileKey,
   writeUploadedFiles,
 };

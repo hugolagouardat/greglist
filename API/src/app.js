@@ -568,7 +568,7 @@ app.get("/ads", async (req, res, next) => {
       where.category = category
     }
     if (city) {
-      where.city = { equals: city, mode: "insensitive" }
+      where.city = { contains: city, mode: "insensitive" }
     }
     if (search) {
       where.OR = [

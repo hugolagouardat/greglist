@@ -1,4 +1,4 @@
-const { AD_KIND, DEFAULT_PROFILE_STORAGE_KEY, PROFILE_KIND, buildAssetUrl } = require("./assets");
+const { AD_KIND, PROFILE_KIND, buildAssetUrl, mimeTypeForStorageKey, pickDefaultProfileKey } = require("./assets");
 
 function toNumber(value) {
   if (value == null) return null
@@ -6,7 +6,7 @@ function toNumber(value) {
   return parseFloat(String(value))
 }
 
-function serializeAvatar(avatar, request) {
+function serializeAvatar(avatar, request, seed) {
   if (avatar?.storageKey) {
     return {
       storageKey: avatar.storageKey,
@@ -17,11 +17,12 @@ function serializeAvatar(avatar, request) {
     };
   }
 
+  const storageKey = pickDefaultProfileKey(seed);
   return {
-    storageKey: DEFAULT_PROFILE_STORAGE_KEY,
-    mimeType: "image/avif",
-    originalName: "default-profile.avif",
-    url: buildAssetUrl(request, PROFILE_KIND, DEFAULT_PROFILE_STORAGE_KEY),
+    storageKey,
+    mimeType: mimeTypeForStorageKey(storageKey),
+    originalName: "default-profile",
+    url: buildAssetUrl(request, PROFILE_KIND, storageKey),
     isDefault: true,
   };
 }
@@ -36,7 +37,7 @@ function serializeUser(user, request) {
     pseudo: user.pseudo,
     city: user.city,
     bio: user.bio,
-    avatar: serializeAvatar(user.avatar, request),
+    avatar: serializeAvatar(user.avatar, request, user.id),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

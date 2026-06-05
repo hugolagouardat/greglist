@@ -49,6 +49,10 @@ export function formatPriceMode(priceMode) {
   return priceModeLabels[priceMode] || priceMode
 }
 
+export function formatServiceTerm(value) {
+  return serviceTermLabels[value] || value
+}
+
 export function formatServiceTerms(values = []) {
   if (!values.length) {
     return 'Modalites non precisees'
